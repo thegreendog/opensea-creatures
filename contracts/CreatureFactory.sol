@@ -11,7 +11,8 @@ contract CreatureFactory is FactoryERC1155, Ownable {
     using Strings for string;
     using SafeMath for uint256;
 
-    event TransferSingle(address indexed _operator, address indexed _from, address indexed _to, uint256 _id, uint256 _value);
+    // event TransferSingle(address indexed _operator, address indexed _from, address indexed _to, uint256 _id, uint256 _value);
+    event TransferBatch(address indexed _operator, address indexed _from, address indexed _to, uint256[] _ids, uint256[] _values);
 
     address public proxyRegistryAddress;
     address public nftAddress;
@@ -25,7 +26,8 @@ contract CreatureFactory is FactoryERC1155, Ownable {
     uint256 constant SUPPLY_PER_TOKEN_ID = 1;
 
     uint256 constant NUM_OPTIONS = 10;
-    uint[NUM_OPTIONS] options = [1,3,4,5,6,7,8,9,10,11];
+    uint[] options = [1,3,4,5,6,7,8,9,10,11];
+    uint[] optionsAmounts = [1,1,1,1,1,1,1,1,1,1];
 
     constructor(address _proxyRegistryAddress, address _nftAddress) {
         proxyRegistryAddress = _proxyRegistryAddress;
@@ -62,11 +64,7 @@ contract CreatureFactory is FactoryERC1155, Ownable {
     }
 
     function fireTransferEvents(address _from, address _to) private {
-        address operator = _msgSender();
-        for (uint256 i = 0; i < NUM_OPTIONS; i++) {
-            // TODO: change for batch mint/emit --> emit TransferBatch
-            emit TransferSingle(operator, _from, _to, options[i], 1);
-        }
+        emit TransferBatch(_msgSender(), _from, _to, options, optionsAmounts);
     }
 
     function uri(uint256 _optionId) override external pure returns (string memory) {

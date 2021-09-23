@@ -4,172 +4,145 @@ pragma solidity ^0.8.0;
 
 import "openzeppelin-solidity/contracts/access/Ownable.sol";
 import "openzeppelin-solidity/contracts/utils/Strings.sol";
-import "./IFactoryERC721.sol";
+import "./IFactoryERC1155.sol";
 import "./Creature.sol";
-import "./CreatureLootBox.sol";
 
-contract CreatureFactory is FactoryERC721, Ownable {
+contract CreatureFactory is FactoryERC1155, Ownable {
     using Strings for string;
+    using SafeMath for uint256;
 
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 indexed tokenId
-    );
+    event TransferSingle(address indexed _operator, address indexed _from, address indexed _to, uint256 _id, uint256 _value);
 
     address public proxyRegistryAddress;
     address public nftAddress;
-    address public lootBoxNftAddress;
-    string public baseURI = "https://creatures-api.opensea.io/api/factory/";
+    string constant internal baseMetadataURI = "https://opensea-creatures-api.herokuapp.com/api/";
+    uint256 constant UINT256_MAX = ~uint256(0);
 
-    /*
-     * Enforce the existence of only 100 OpenSea creatures.
-     */
-    uint256 CREATURE_SUPPLY = 100;
+    /**
+    * Optionally set this to a small integer to enforce limited existence per option/token ID
+    * (Otherwise rely on sell orders on OpenSea, which can only be made by the factory owner.)
+    */
+    uint256 constant SUPPLY_PER_TOKEN_ID = 1;
 
-    /*
-     * Three different options for minting Creatures (basic, premium, and gold).
-     */
-    uint256 NUM_OPTIONS = 3;
-    uint256 SINGLE_CREATURE_OPTION = 0;
-    uint256 MULTIPLE_CREATURE_OPTION = 1;
-    uint256 LOOTBOX_OPTION = 2;
-    uint256 NUM_CREATURES_IN_MULTIPLE_CREATURE_OPTION = 4;
+    uint256 constant NUM_OPTIONS = 10;
+    uint[NUM_OPTIONS] options = [1,3,4,5,6,7,8,9,10,11];
 
     constructor(address _proxyRegistryAddress, address _nftAddress) {
         proxyRegistryAddress = _proxyRegistryAddress;
         nftAddress = _nftAddress;
-        lootBoxNftAddress = address(
-            new CreatureLootBox(_proxyRegistryAddress, address(this))
-        );
-
         fireTransferEvents(address(0), owner());
     }
 
     function name() override external pure returns (string memory) {
-        return "OpenSeaCreature Item Sale";
+        return "My Collectible Pre-Sale";
     }
 
     function symbol() override external pure returns (string memory) {
-        return "CPF";
+        return "MCP";
     }
 
     function supportsFactoryInterface() override public pure returns (bool) {
         return true;
     }
 
-    function numOptions() override public view returns (uint256) {
+    function factorySchemaName() override external pure returns (string memory) {
+        return "ERC1155";
+    }
+
+    function numOptions() override public pure returns (uint256) {
         return NUM_OPTIONS;
     }
 
-    function transferOwnership(address newOwner) override public onlyOwner {
-        address _prevOwner = owner();
-        super.transferOwnership(newOwner);
-        fireTransferEvents(_prevOwner, newOwner);
+    function canMint(uint256 _optionId, uint256 _amount) override public view returns (bool) {
+        return _canMint(msg.sender, _optionId, _amount);
+    }
+
+    function mint(uint256 _optionId, address _toAddress, uint256 _amount, bytes calldata _data) override public {
+        return _mint(_optionId, _toAddress, _amount, _data);
     }
 
     function fireTransferEvents(address _from, address _to) private {
+        address operator = _msgSender();
         for (uint256 i = 0; i < NUM_OPTIONS; i++) {
-            emit Transfer(_from, _to, i);
+            // TODO: change for batch mint/emit --> emit TransferBatch
+            emit TransferSingle(operator, _from, _to, options[i], 1);
         }
     }
 
-    function mint(uint256 _optionId, address _toAddress) override public {
-        // Must be sent from the owner proxy or owner.
-        ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
-        assert(
-            address(proxyRegistry.proxies(owner())) == _msgSender() ||
-                owner() == _msgSender() ||
-                _msgSender() == lootBoxNftAddress
-        );
-        require(canMint(_optionId));
-
-        Creature openSeaCreature = Creature(nftAddress);
-        if (_optionId == SINGLE_CREATURE_OPTION) {
-            openSeaCreature.mintTo(_toAddress);
-        } else if (_optionId == MULTIPLE_CREATURE_OPTION) {
-            for (
-                uint256 i = 0;
-                i < NUM_CREATURES_IN_MULTIPLE_CREATURE_OPTION;
-                i++
-            ) {
-                openSeaCreature.mintTo(_toAddress);
-            }
-        } else if (_optionId == LOOTBOX_OPTION) {
-            CreatureLootBox openSeaCreatureLootBox = CreatureLootBox(
-                lootBoxNftAddress
-            );
-            openSeaCreatureLootBox.mintTo(_toAddress);
-        }
-    }
-
-    function canMint(uint256 _optionId) override public view returns (bool) {
-        if (_optionId >= NUM_OPTIONS) {
-            return false;
-        }
-
-        Creature openSeaCreature = Creature(nftAddress);
-        uint256 creatureSupply = openSeaCreature.totalSupply();
-
-        uint256 numItemsAllocated = 0;
-        if (_optionId == SINGLE_CREATURE_OPTION) {
-            numItemsAllocated = 1;
-        } else if (_optionId == MULTIPLE_CREATURE_OPTION) {
-            numItemsAllocated = NUM_CREATURES_IN_MULTIPLE_CREATURE_OPTION;
-        } else if (_optionId == LOOTBOX_OPTION) {
-            CreatureLootBox openSeaCreatureLootBox = CreatureLootBox(
-                lootBoxNftAddress
-            );
-            numItemsAllocated = openSeaCreatureLootBox.itemsPerLootbox();
-        }
-        return creatureSupply < (CREATURE_SUPPLY - numItemsAllocated);
-    }
-
-    function tokenURI(uint256 _optionId) override external view returns (string memory) {
-        return string(abi.encodePacked(baseURI, Strings.toString(_optionId)));
+    function uri(uint256 _optionId) override external pure returns (string memory) {
+        return string(abi.encodePacked(baseMetadataURI, "factory/", Strings.toString(_optionId)));
     }
 
     /**
-     * Hack to get things to work automatically on OpenSea.
-     * Use transferFrom so the frontend doesn't have to worry about different method names.
-     */
-    function transferFrom(
-        address _from,
+    * @dev Main minting logic implemented here!
+    */
+    function _mint(
+        uint256 _optionId,
+        address _toAddress,
+        uint256 _amount,
+        bytes memory _data
+    ) internal {
+        require(_canMint(msg.sender, _optionId, _amount), "MyFactory#_mint: CANNOT_MINT_MORE");
+        Creature nftContract = Creature(nftAddress);
+        nftContract.mint(_toAddress, _optionId, _amount, _data);
+    }
+
+    /**
+    * Get the factory's ownership of Option.
+    * Should be the amount it can still mint.
+    * NOTE: Called by `canMint`
+    */
+    function balanceOf(
+        address _owner,
+        uint256 _optionId
+    ) override public view returns (uint256) {
+        if (!_isOwnerOrProxy(_owner)) {
+        // Only the factory owner or owner's proxy can have supply
+        return 0;
+        }
+
+        Creature nftContract = Creature(nftAddress);
+        uint256 currentSupply = nftContract.totalSupply(_optionId);
+        return SUPPLY_PER_TOKEN_ID.sub(currentSupply);
+    }
+
+    /**
+    * Hack to get things to work automatically on OpenSea.
+    * Use safeTransferFrom so the frontend doesn't have to worry about different method names.
+    */
+    function safeTransferFrom(
+        address /* _from */,
         address _to,
-        uint256 _tokenId
-    ) public {
-        mint(_tokenId, _to);
+        uint256 _optionId,
+        uint256 _amount,
+        bytes calldata _data
+    ) external {
+        _mint(_optionId, _to, _amount, _data);
     }
 
-    /**
-     * Hack to get things to work automatically on OpenSea.
-     * Use isApprovedForAll so the frontend doesn't have to worry about different method names.
-     */
-    function isApprovedForAll(address _owner, address _operator)
-        public
-        view
-        returns (bool)
-    {
-        if (owner() == _owner && _owner == _operator) {
-            return true;
-        }
+    //////
+    // Below methods shouldn't need to be overridden or modified
+    //////
 
+    function isApprovedForAll(
+        address _owner,
+        address _operator
+    ) public view returns (bool) {
+        return owner() == _owner && _isOwnerOrProxy(_operator);
+    }
+
+    function _canMint(
+        address _fromAddress,
+        uint256 _optionId,
+        uint256 _amount
+    ) internal view returns (bool) {
+        return _amount > 0 && balanceOf(_fromAddress, _optionId) >= _amount;
+    }
+
+    function _isOwnerOrProxy(
+        address _address
+    ) internal view returns (bool) {
         ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
-        if (
-            owner() == _owner &&
-            address(proxyRegistry.proxies(_owner)) == _operator
-        ) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Hack to get things to work automatically on OpenSea.
-     * Use isApprovedForAll so the frontend doesn't have to worry about different method names.
-     */
-    function ownerOf(uint256 _tokenId) public view returns (address _owner) {
-        return owner();
+        return owner() == _address || address(proxyRegistry.proxies(owner())) == _address;
     }
 }

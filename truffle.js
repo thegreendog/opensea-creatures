@@ -36,6 +36,7 @@ module.exports = {
       },
       gas: 5000000,
       network_id: 4,
+      skipDryRun: true,     // Skip dry run before migrations? (default: false for public nets )
     },
     live: {
       network_id: 1,

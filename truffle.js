@@ -36,6 +36,7 @@ module.exports = {
       },
       gas: 5000000,
       network_id: 4,
+      skipDryRun: true, // Skip dry run before migrations? (default: false for public nets )
     },
     live: {
       network_id: 1,
@@ -59,15 +60,13 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 20   // Optimize for how many times you intend to run the code
+          runs: 20, // Optimize for how many times you intend to run the code
         },
       },
     },
   },
-  plugins: [
-    'truffle-plugin-verify'
-  ],
+  plugins: ["truffle-plugin-verify"],
   api_keys: {
-    etherscan: 'ETHERSCAN_API_KEY_FOR_VERIFICATION'
-  }
+    etherscan: "ETHERSCAN_API_KEY_FOR_VERIFICATION",
+  },
 };

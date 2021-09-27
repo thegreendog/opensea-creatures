@@ -1,0 +1,15 @@
+{
+    "namespaceResolver.exclude": "**/node_modules/**",  // Exclude glob pattern while finding files
+    "namespaceResolver.showMessageOnStatusBar": true,  // Show message on status bar instead of notification box
+    "namespaceResolver.autoSort": true,                 // Auto sort after imports
+    "namespaceResolver.sortOnSave": true,              // Auto sort when a file is saved
+    "namespaceResolver.sortAlphabetically": true,      // Sort imports in alphabetical order instead of line length
+    "namespaceResolver.sortNatural": false,             // Sort imports using a 'natural order' algorithm
+    "namespaceResolver.leadingSeparator": true,         // Expand class with leading namespace separator
+    "namespaceResolver.highlightOnSave": false,         // Auto highlight not imported and not used when a file is saved
+    "namespaceResolver.highlightOnOpen": false,          // Auto highlight not imported and not used when a file is opened
+    "[javascript]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      },
+}
